@@ -273,9 +273,12 @@
       <b>Choose a video</b> or drop it here
       <small>.mp4 · up to 4 GB · the first 2 minutes are analysed</small>
     </label>
-    <div class="progress"><div id="bar"></div></div>
-    <div class="status" id="status"></div>
-    <p class="caption">No video to hand? <a href="#" id="try-sample">Run a 60-second part of a sample video</a>.</p>
+    <div class="run" id="run" hidden>
+      <div class="run-head"><b id="run-name"></b><button type="button" class="run-cancel" id="cancel">Cancel</button></div>
+      <div class="progress"><div id="bar"></div></div>
+      <div class="status" id="status" aria-live="polite"></div>
+    </div>
+    <p class="caption" id="demo-note">No video to hand? <a href="#" id="try-sample">Run a 60-second part of a sample video</a>.</p>
   </div>
 </section>
 

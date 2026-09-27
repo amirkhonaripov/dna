@@ -172,6 +172,14 @@ ol.findings p { margin: 4px 0 0; font-size: 15px; }
 .drop:hover, .drop.over { border-color: var(--ink); background: var(--panel); }
 .drop b { font-weight: 500; }
 .drop small { display: block; color: var(--muted); margin-top: 6px; }
+.run { border: 1px solid var(--rule); border-radius: 3px; padding: 22px 24px; background: var(--panel); }
+.run[hidden], .drop[hidden], #demo-note[hidden] { display: none; }
+.run-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.run-head b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-cancel { flex: none; font: 500 13px var(--sans); color: var(--ink); background: none; border: 1px solid var(--muted);
+  border-radius: 2px; padding: 6px 12px; cursor: pointer; }
+.run-cancel:hover { border-color: var(--ink); }
+.run .progress { height: 6px; border-radius: 3px; margin-top: 18px; }
 .progress { height: 3px; background: var(--rule); margin-top: 16px; overflow: hidden; }
 .progress div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
 .status { font: 13px var(--mono); color: var(--muted); margin-top: 10px; min-height: 1.4em; }

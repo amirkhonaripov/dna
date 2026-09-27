@@ -2,7 +2,8 @@
 
 // The demo backend (demo_server/). Empty = not deployed yet.
 const DEMO_API = "https://sanjar--pipeline-web.modal.run";
-const CHUNK = 32 * 1024 * 1024;     // upload chunk size
+const CHUNK = 4 * 1024 * 1024;      // upload chunk size
+const PARALLEL = 8;                  // chunks in flight at once (a single stream to the server is slow)
 
 const CLASSES = ["accident", "near_miss", "red_light", "wrong_way", "illegal_u_turn", "stopped_vehicle", "jaywalking",
   "failure_to_yield", "illegal_turn", "solid_line_crossing", "stop_line", "congestion", "road_obstacle", "fire_smoke"];
@@ -492,14 +493,37 @@ async function results() {
 /* ---------------- demo ---------------- */
 
 function demo() {
-  const drop = $("#drop"), input = $("#file"), bar = $("#bar"), status = $("#status");
+  const drop = $("#drop"), input = $("#file"), panel = $("#run"), bar = $("#bar"), status = $("#status");
+  const cancelBtn = $("#cancel"), note = $("#demo-note");
   const say = (msg, frac) => { status.textContent = msg; if (frac !== undefined) bar.style.width = `${Math.round(frac * 100)}%`; };
-  if (!DEMO_API) say("The demo server is not connected yet.");
+  const mb = b => (b / 1e6).toFixed(b < 1e8 ? 1 : 0);
+  const eta = s => (s < 60 ? `${Math.max(1, Math.round(s))} s` : `${Math.round(s / 60)} min`);
+  const JSON_HDR = { "Content-Type": "application/json" };
+  let cur = null;   // the run in progress: { upload, job, xhrs, cancelled }
+
+  // the drop box and the progress panel take turns: one run at a time
+  const showPanel = title => {
+    $("#run-name").textContent = title;
+    cancelBtn.textContent = "Cancel";
+    drop.hidden = note.hidden = true; panel.hidden = false;
+  };
+  const showDrop = () => { panel.hidden = true; drop.hidden = note.hidden = false; input.value = ""; };
+
+  if (!DEMO_API) { drop.hidden = true; note.textContent = "The demo server is not connected yet."; }
   ["dragover", "dragenter"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
   ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, () => drop.classList.remove("over")));
   drop.addEventListener("drop", e => { e.preventDefault(); if (e.dataTransfer.files[0]) run(e.dataTransfer.files[0]); });
   input.addEventListener("change", () => input.files[0] && run(input.files[0]));
   $("#try-sample").addEventListener("click", e => { e.preventDefault(); run(null); });
+  cancelBtn.addEventListener("click", () => {
+    if (!cur) return showDrop();                      // after a finished run the button reads "Upload another"
+    cur.cancelled = true;
+    cur.xhrs.forEach(x => x.abort());
+    fetch(`${DEMO_API}/cancel`, { method: "POST", headers: JSON_HDR, body: JSON.stringify({ upload: cur.upload, job: cur.job }) })
+      .catch(() => {});
+    cur = null;
+    showDrop();
+  });
 
   async function post(path, body, headers = {}) {
     const res = await fetch(`${DEMO_API}${path}`, { method: "POST", body, headers });
@@ -507,31 +531,114 @@ function demo() {
     if (!res.ok) throw new Error(out.detail || `error ${res.status}`);
     return out;
   }
+  // one chunk, with byte-level progress (fetch cannot report upload progress)
+  function sendChunk(run, off, blob, onBytes) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      run.xhrs.add(xhr);
+      xhr.open("POST", `${DEMO_API}/uploads/${run.upload}?offset=${off}`);
+      xhr.setRequestHeader("Content-Type", "application/octet-stream");
+      xhr.upload.onprogress = e => onBytes(e.loaded);
+      xhr.onload = () => { run.xhrs.delete(xhr); xhr.status < 300 ? resolve() : reject(new Error(`error ${xhr.status}`)); };
+      xhr.onerror = xhr.onabort = () => { run.xhrs.delete(xhr); reject(new Error("the connection dropped")); };
+      xhr.send(blob);
+    });
+  }
+  const progress = (run, done, total, t0) => {
+    if (run.cancelled) return;
+    const rate = done / Math.max((performance.now() - t0) / 1000, 0.5);
+    const left = rate > 0 && done < total ? ` · about ${eta((total - done) / rate)} left` : "";
+    say(`Uploading ${Math.round(100 * done / total)}% · ${mb(done)} of ${mb(total)} MB · ${(rate / 1e6).toFixed(1)} MB/s${left}`,
+      0.02 + 0.28 * done / total);
+  };
+  // fast path: the browser sends the whole file straight to Google Drive, to an upload the server opened
+  async function viaDrive(run, file) {
+    const d = await post("/uploads/drive", JSON.stringify({ name: file.name, size: file.size, origin: location.origin }), JSON_HDR);
+    run.upload = d.id;
+    const t0 = performance.now();
+    const body = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      run.xhrs.add(xhr);
+      xhr.open("PUT", d.url);
+      xhr.upload.onprogress = e => progress(run, e.loaded, file.size, t0);
+      xhr.onload = () => { run.xhrs.delete(xhr); xhr.status < 300 ? resolve(xhr.responseText) : reject(new Error(`error ${xhr.status}`)); };
+      xhr.onerror = xhr.onabort = () => { run.xhrs.delete(xhr); reject(new Error("the connection dropped")); };
+      xhr.send(file);
+    });
+    run.driveFile = JSON.parse(body).id;
+  }
+  // fallback: chunks to the demo server itself
+  async function upload(run, file) {
+    const offsets = [];
+    for (let off = 0; off < file.size; off += CHUNK) offsets.push(off);
+    const sent = new Map(), t0 = performance.now();
+    const show = () => progress(run, [...sent.values()].reduce((a, b) => a + b, 0), file.size, t0);
+    const timer = setInterval(show, 500);
+    try {
+      const worker = async () => {
+        for (let off; (off = offsets.shift()) !== undefined;) {
+          for (let attempt = 1; ; attempt++) {
+            if (run.cancelled) return;
+            try {
+              await sendChunk(run, off, file.slice(off, off + CHUNK), n => sent.set(off, n));
+              sent.set(off, Math.min(CHUNK, file.size - off));
+              break;
+            } catch (err) {
+              sent.set(off, 0);
+              if (attempt === 3 || run.cancelled) throw err;
+            }
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: PARALLEL }, worker));
+    } finally { clearInterval(timer); }
+    show();
+  }
+
   async function run(file) {
-    if (!DEMO_API) return say("The demo server is not connected yet.");
-    let job;
+    if (cur || !DEMO_API) return;
+    if (file && file.size > 4e9) { note.hidden = false; note.textContent = "That file is over 4 GB."; return; }
+    const me = cur = { upload: null, driveFile: null, job: null, xhrs: new Set(), cancelled: false };
+    const title = file ? `${file.name} · ${mb(file.size)} MB` : "Sample video, 60 s";
+    showPanel(title);
+    say("Connecting to the server… after a quiet spell it takes up to a minute to start.", 0.02);
+    const finish = msg => { if (me.cancelled) return; cur = null; say(msg); cancelBtn.textContent = "Upload another"; };
     try {
       if (file) {
-        if (file.size > 4e9) return say("That file is over 4 GB.");
-        const up = await post("/uploads", JSON.stringify({ name: file.name, size: file.size }), { "Content-Type": "application/json" });
-        for (let off = 0; off < file.size; off += CHUNK) {
-          await post(`/uploads/${up.id}?offset=${off}`, file.slice(off, off + CHUNK), { "Content-Type": "application/octet-stream" });
-          say(`Uploading… ${Math.round(Math.min(1, (off + CHUNK) / file.size) * 100)}%`, 0.3 * Math.min(1, (off + CHUNK) / file.size));
+        try {
+          await viaDrive(me, file);
+        } catch (err) {
+          if (me.cancelled) return;
+          if (me.upload) post("/cancel", JSON.stringify({ upload: me.upload }), JSON_HDR).catch(() => {});
+          me.upload = me.driveFile = null;
+          say("Uploading to the demo server directly…", 0.02);
+          me.upload = (await post("/uploads", JSON.stringify({ name: file.name, size: file.size }), JSON_HDR)).id;
+          if (me.cancelled) return;
+          await upload(me, file);
         }
-        job = await post("/jobs", JSON.stringify({ upload: up.id }), { "Content-Type": "application/json" });
+        if (me.cancelled) return;
+        say("Upload complete. Starting the analysis…", 0.3);
+        const spec = me.driveFile ? { upload: me.upload, drive_file: me.driveFile } : { upload: me.upload };
+        me.job = (await post("/jobs", JSON.stringify(spec), JSON_HDR)).id;
       } else {
-        job = await post("/jobs", JSON.stringify({ sample: "C3905_60s" }), { "Content-Type": "application/json" });
+        me.job = (await post("/jobs", JSON.stringify({ sample: "C3905_60s" }), JSON_HDR)).id;
       }
-    } catch (err) { return say(`Not accepted: ${err.message}.`); }
+    } catch (err) { return finish(`Not accepted: ${err.message}.`); }
     for (;;) {
       await new Promise(r => setTimeout(r, 1500));
-      let st;
-      try { st = await (await fetch(`${DEMO_API}/jobs/${job.id}`)).json(); } catch (err) { continue; }
-      if (st.state === "error") return say(`The run failed: ${st.message || "unknown error"}.`);
+      if (me.cancelled) return;
+      let st, res;
+      try { res = await fetch(`${DEMO_API}/jobs/${me.job}`); st = await res.json(); } catch (err) { continue; }
+      if (me.cancelled) return;
+      if (res.status === 404) return finish("The server restarted during the run, so this job was lost. Please try again.");
+      if (st.state === "error") return finish(`The run failed: ${st.message || "unknown error"}.`);
+      if (st.state === "cancelled") return finish("Cancelled.");
       if (st.state !== "done") { say(`${st.stage || "Queued"}…`, 0.3 + 0.7 * (st.progress || 0)); continue; }
       const n = st.result.events;
-      say(`Done: ${n} event${n === 1 ? "" : "s"}${st.result.trimmed ? " in the first 2 minutes" : ""}. Opened in the explorer.`, 1);
-      const entry = { id: st.result.clip, title: file ? file.name.slice(0, 28) : "Sample, 60 s", group: "upload", base: `${DEMO_API}/jobs/${job.id}/site/` };
+      finish(`Done: ${n} event${n === 1 ? "" : "s"}${st.result.trimmed ? " in the first 2 minutes" : ""}. Opened in the explorer above.`);
+      bar.style.width = "100%";
+      const entry = { id: st.result.clip, title: file ? file.name.slice(0, 28) : "Sample, 60 s", group: "upload",
+        base: `${DEMO_API}/jobs/${me.job}/site/` };
       X.index.push(entry);
       X.tabs.upload.add(entry);
       openClip(entry);
