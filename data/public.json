@@ -1,0 +1,8 @@
+[
+ {"name": "TUMTraf Accid3nD (motorway)", "clips": 45,
+  "result": "The rollover found within a second; a vehicle fire and its smoke reported on 9 clips seen from three cameras; people on the road after crashes. A few short false accident reports in smoke and fog."},
+ {"name": "TAD (CCTV crashes)", "clips": 36, "result": "Accident reported in 31 of 36 clips."},
+ {"name": "TAD-benchmark", "clips": 19, "result": "Accident in all 3 crash clips; nothing rare reported on the 16 normal clips."},
+ {"name": "UCF-Crime road accidents", "clips": 133, "result": "Accident reported in 97 of 133 low-resolution surveillance clips."},
+ {"name": "D-Fire (fire and smoke images)", "clips": 150, "result": "Fire and smoke found in 98% of the images, with no false fire on our sample videos."}
+]

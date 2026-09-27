@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Report — DNA</title>
+<meta name="description" content="What we built for the WIUT Hackathon 2026 computer vision track, what worked, what did not, and what we would do next.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&family=Newsreader:opsz,wght@6..72,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2317171a'/%3E%3Ccircle cx='8' cy='4.5' r='2' fill='%23b5401c'/%3E%3Ccircle cx='8' cy='11.5' r='2' fill='%23f6f5f1'/%3E%3C/svg%3E">
+</head>
+<body>
+<nav class="nav">
+  <div class="wrap">
+    <a class="brand" href="index.html"><b>DNA</b></a>
+    <ul><li><a class="l" href="index.html#approach">Approach</a></li><li><a class="l" href="index.html#explorer">Explorer</a></li>
+      <li><a class="l" href="index.html#results">Results</a></li><li><a class="l" href="index.html#demo">Demo</a></li>
+      <li><a class="l on" href="report.html">Report</a></li><li><a class="l" href="index.html#team">Team</a></li></ul>
+    <button class="theme" id="theme" aria-label="Switch between light and dark"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+  <article class="report" style="padding:64px 0 24px">
+    <div class="kicker">Technical report</div>
+    <h1 style="font-size:clamp(30px,4.4vw,44px)">Report</h1>
+
+    <h2>What we built</h2>
+    <p>A detector and tracker turn each video into tracks of road users. A scene model inferred from the same video
+      gives the rules their geometry: crossings, stop lines, solid lane lines, the junction box, the signal phase and
+      lane directions. Eleven classes are rules on tracks and geometry; accident, fire and smoke and road obstacle
+      are confirmed by a small vision-language model before they are reported. Part B scores collision courses
+      between pairs of road users, frame by frame.</p>
+
+    <h2>What worked</h2>
+    <ul>
+      <li><b>Inferring the layout per video.</b> No map is drawn by hand, so the pipeline follows the camera when it
+        moves between clips.</li>
+      <li><b>Reading the signal from lamps and traffic together.</b> The lamps give the phase; the moment traffic
+        leaves the stop line picks which signal head governs it.</li>
+      <li><b>Treating an approach's lane lines as one set.</b> The solid lines of an approach all end at the same
+        distance before the stop line, so each line is ended where the others end unless its own paint clearly goes further. This fixed lines cut short by poles or worn paint, and lines stretched by a gantry hiding the first dashes.</li>
+      <li><b>Measuring motion in car widths.</b> Learned from each video's own cars, so the same thresholds hold near
+        and far from the camera, and on other cameras.</li>
+      <li><b>Confirming rare events with a language model.</b> It keeps accident, fire and obstacle reports rare on
+        normal traffic while still finding real crashes and fires on public footage.</li>
+    </ul>
+
+    <h2>What did not</h2>
+    <ul>
+      <li><b>One hand-drawn map for every clip.</b> The camera moves between videos, and warping a single map was not
+        precise enough for lane-level rules.</li>
+      <li><b>An off-the-shelf accident detector.</b> It fired on normal traffic in our samples, so we replaced it with
+        track contact plus the language model.</li>
+      <li><b>Accident-anticipation models from dashcam research.</b> Trained on footage from inside a car, they do not
+        carry over to a fixed camera above the road.</li>
+      <li><b>Part B.</b> Our collision-course score alarms rarely and late: it stays quiet on normal traffic but
+        anticipates few real crashes.</li>
+    </ul>
+
+    <h2>What we would do next</h2>
+    <ul>
+      <li>A small learned risk scorer on pair features such as time to collision, closing speed and braking, trained on
+        crash lead-ups, to anticipate earlier.</li>
+      <li>Wheel positions from instance masks, so buses and trucks can be judged on solid lines as precisely as
+        cars.</li>
+      <li>Joining a pedestrian's track across short occlusions, which today can split one event in two.</li>
+    </ul>
+    <p style="margin-top:36px"><a href="index.html">← Back to the main page</a></p>
+  </article>
+</main>
+<footer><div class="wrap"><span>Team DNA · WIUT Hackathon 2026</span></div></footer>
+<script>
+(() => {
+  const btn = document.getElementById("theme"), root = document.documentElement;
+  const dark = () => (root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches);
+  try { const t = localStorage.getItem("theme"); if (t) root.dataset.theme = t; } catch (err) { /* private mode */ }
+  const SUN = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>';
+  const MOON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7z"/></svg>';
+  const label = () => { btn.innerHTML = dark() ? SUN : MOON; btn.title = dark() ? "Light mode" : "Dark mode"; };
+  btn.addEventListener("click", () => { root.dataset.theme = dark() ? "light" : "dark"; try { localStorage.setItem("theme", root.dataset.theme); } catch (err) { /* ignore */ } label(); });
+  label();
+})();
+</script>
+</body>
+</html>

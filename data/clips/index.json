@@ -1,0 +1,58 @@
+[
+ {
+  "id": "C3896",
+  "title": "C3896",
+  "group": "samples",
+  "light": "day",
+  "caption": ""
+ },
+ {
+  "id": "C3897",
+  "title": "C3897",
+  "group": "samples",
+  "light": "day",
+  "caption": ""
+ },
+ {
+  "id": "C3902",
+  "title": "C3902",
+  "group": "samples",
+  "light": "golden hour",
+  "caption": ""
+ },
+ {
+  "id": "C3905",
+  "title": "C3905",
+  "group": "samples",
+  "light": "dusk",
+  "caption": ""
+ },
+ {
+  "id": "r09_s02__s040_camera_basler_north_50mm",
+  "title": "Rollover",
+  "group": "public",
+  "light": "day",
+  "caption": "A van and its trailer overturn at 0:31. TUMTraf Accid3nD (TU Munich), CC BY-NC-SA 4.0"
+ },
+ {
+  "id": "r09_s05__s040_camera_basler_north_50mm",
+  "title": "Vehicle fire",
+  "group": "public",
+  "light": "day",
+  "caption": "A burning car fills the motorway with smoke. TUMTraf Accid3nD (TU Munich), CC BY-NC-SA 4.0"
+ },
+ {
+  "id": "r09_s07__s040_camera_basler_north_50mm",
+  "title": "Firefighters",
+  "group": "public",
+  "light": "day",
+  "caption": "The same fire from another camera, with firefighters on the carriageway. TUMTraf Accid3nD (TU Munich), CC BY-NC-SA 4.0"
+ },
+ {
+  "id": "r09_s01__s050_camera_basler_south_50mm",
+  "title": "Crash scene",
+  "group": "public",
+  "light": "day",
+  "caption": "Traffic stops behind a crash; a driver walks on the carriageway. TUMTraf Accid3nD (TU Munich), CC BY-NC-SA 4.0"
+ }
+]

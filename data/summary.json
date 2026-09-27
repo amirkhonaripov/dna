@@ -1,0 +1,12 @@
+{
+ "score_a": 0.9511628241040005,
+ "per_class": {
+  "failure_to_yield": 0.938,
+  "illegal_turn": 1.0,
+  "jaywalking": 0.925,
+  "red_light": 1.0,
+  "solid_line_crossing": 0.795,
+  "stop_line": 1.0,
+  "stopped_vehicle": 1.0
+ }
+}

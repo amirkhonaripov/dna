@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DNA — Traffic Event Detection</title>
+<meta name="description" content="Team DNA, WIUT Hackathon 2026, computer vision track: traffic event detection and collision risk from a fixed CCTV camera.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&family=Newsreader:opsz,wght@6..72,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2317171a'/%3E%3Ccircle cx='8' cy='4.5' r='2' fill='%23b5401c'/%3E%3Ccircle cx='8' cy='11.5' r='2' fill='%23f6f5f1'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top"><b>DNA</b></a>
+    <ul>
+      <li><a class="l" href="#approach">Approach</a></li>
+      <li><a class="l" href="#explorer">Explorer</a></li>
+      <li><a class="l" href="#results">Results</a></li>
+      <li><a class="l" href="#demo">Demo</a></li>
+      <li><a class="l" href="report.html">Report</a></li>
+      <li><a class="l" href="#team">Team</a></li>
+    </ul>
+    <button class="theme" id="theme" aria-label="Switch between light and dark"></button>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">Team DNA · WIUT Hackathon 2026 · Computer vision track</div>
+    <h1>Traffic event detection from a fixed camera</h1>
+    <p class="lede">Our pipeline finds 14 kinds of traffic events in CCTV video and scores the risk of a collision in
+      every frame. The road layout is inferred from each video, so nothing is drawn by hand.</p>
+    <div class="actions">
+      <a class="btn" href="#explorer">Open the explorer</a>
+      <a class="btn ghost" href="#demo">Try the demo</a>
+    </div>
+  </div>
+</header>
+
+<hr>
+
+<section id="approach">
+  <div class="wrap">
+    <div class="head">
+      <div class="kicker"><span>01</span>Approach</div>
+      <h2>Approach</h2>
+      <p class="lede">Part A returns every event in a video as <code>[start, end, label]</code>. Part B reads frames one
+        at a time and returns a collision risk for each, using only the frames seen so far.</p>
+    </div>
+
+    <div class="diagram" aria-label="Pipeline diagram">
+      <svg viewBox="0 0 1080 450" role="img">
+        <defs>
+          <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" class="arrow" style="stroke:none"/>
+          </marker>
+        </defs>
+        <text class="lane" x="10" y="30">PART A · EVENTS</text>
+        <g>
+          <rect class="box" x="10" y="50" width="120" height="64" rx="2"/><text class="t" x="24" y="76">Video</text><text class="s" x="24" y="96">.mp4</text>
+          <rect class="box" x="160" y="50" width="170" height="64" rx="2"/><text class="t" x="174" y="76">Decode</text><text class="s" x="174" y="96">every 2nd frame, 1080p</text>
+          <rect class="box learn" x="360" y="50" width="190" height="64" rx="2"/><text class="t" x="374" y="76">YOLO11-L + ByteTrack</text><text class="s" x="374" y="96">road users → tracks</text>
+          <rect class="box" x="580" y="50" width="200" height="64" rx="2"/><text class="t" x="594" y="76">Event rules</text><text class="s" x="594" y="96">11 classes</text>
+          <rect class="box" x="810" y="50" width="120" height="64" rx="2"/><text class="t" x="824" y="76">Segments</text><text class="s" x="824" y="96">merge · clamp</text>
+          <rect class="box" x="960" y="50" width="110" height="64" rx="2"/><text class="t" x="974" y="76">Events</text><text class="s" x="974" y="96">[s, e, label]</text>
+
+          <rect class="box" x="160" y="150" width="170" height="64" rx="2"/><text class="t" x="174" y="176">Clean background</text><text class="s" x="174" y="196">median, users masked</text>
+          <rect class="box learn" x="360" y="150" width="190" height="64" rx="2"/><text class="t" x="374" y="176">Mask2Former Swin-L</text><text class="s" x="374" y="196">road · kerb · paint</text>
+          <rect class="box soft" x="580" y="150" width="200" height="64" rx="2"/><text class="t" x="594" y="176">Scene inference</text><text class="s" x="594" y="196">layout · signal · lanes</text>
+
+          <rect class="box" x="160" y="250" width="170" height="64" rx="2"/><text class="t" x="174" y="276">Candidates</text><text class="s" x="174" y="296">fire · static · scans</text>
+          <rect class="box learn" x="360" y="250" width="190" height="64" rx="2"/><text class="t" x="374" y="276">Qwen3-VL-2B</text><text class="s" x="374" y="296">yes / no on frames</text>
+          <rect class="box" x="580" y="250" width="200" height="64" rx="2"/><text class="t" x="594" y="276">Rare classes</text><text class="s" x="594" y="296">accident · fire · obstacle</text>
+        </g>
+        <g>
+          <path d="M130,82 H158" marker-end="url(#ah)"/><path d="M330,82 H358" marker-end="url(#ah)"/>
+          <path d="M550,82 H578" marker-end="url(#ah)"/><path d="M780,82 H808" marker-end="url(#ah)"/>
+          <path d="M930,82 H958" marker-end="url(#ah)"/>
+          <path d="M245,114 V148" marker-end="url(#ah)"/>
+          <path d="M330,182 H358" marker-end="url(#ah)"/><path d="M550,182 H578" marker-end="url(#ah)"/>
+          <path d="M680,150 V116" marker-end="url(#ah)"/>
+          <path d="M160,100 H146 V282 H158" marker-end="url(#ah)"/>
+          <path d="M330,282 H358" marker-end="url(#ah)"/><path d="M550,282 H578" marker-end="url(#ah)"/>
+          <path d="M780,282 H870 V116" marker-end="url(#ah)"/>
+        </g>
+        <line x1="10" x2="1070" y1="340" y2="340" stroke="var(--rule)" stroke-dasharray="3 4"/>
+        <text class="lane" x="10" y="362">PART B · RISK, FRAME BY FRAME</text>
+        <g>
+          <rect class="box" x="10" y="376" width="120" height="64" rx="2"/><text class="t" x="24" y="402">Frames</text><text class="s" x="24" y="422">as received</text>
+          <rect class="box learn" x="160" y="376" width="390" height="64" rx="2"/><text class="t" x="174" y="402">YOLO11-L 960 px + ByteTrack</text><text class="s" x="174" y="422">about 6 frames/s</text>
+          <rect class="box" x="580" y="376" width="200" height="64" rx="2"/><text class="t" x="594" y="402">Collision course</text><text class="s" x="594" y="422">time to collision</text>
+          <rect class="box" x="810" y="376" width="260" height="64" rx="2"/><text class="t" x="824" y="402">Risk</text><text class="s" x="824" y="422">0–1 for every frame</text>
+          <path d="M130,408 H158" marker-end="url(#ah)"/><path d="M550,408 H578" marker-end="url(#ah)"/><path d="M780,408 H808" marker-end="url(#ah)"/>
+        </g>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--accent-soft);outline:1px solid var(--accent)"></i>pre-trained model</span>
+      <span><i style="background:var(--panel);outline:1px solid var(--rule)"></i>computed from each video</span>
+      <span><i style="outline:1px solid var(--ink)"></i>rules</span>
+    </div>
+
+    <div class="block">
+      <h3>How each part works</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Part</th><th>How</th><th>Learned or rule</th></tr></thead>
+        <tbody>
+          <tr><td>Road users</td><td>YOLO11-L finds cars, buses, trucks, motorcycles, bicycles and people on every 2nd frame;
+            ByteTrack links them into tracks.</td><td>pre-trained model</td></tr>
+          <tr><td>Road layout</td><td>A background image without traffic is built from the video. Mask2Former marks road, kerbs
+            and paint on it, and where vehicles and people move gives the carriageway, crossings, stop lines, solid lane lines
+            and the junction.</td><td>computed from each video</td></tr>
+          <tr><td>Traffic light</td><td>The lamps of each signal head are read in every frame. The head whose changes match when
+            traffic starts from the stop line is the one that controls it.</td><td>computed from each video</td></tr>
+          <tr><td>Scale</td><td>The width of cars at each point of the image gives a ruler, so speeds and distances are in car
+            widths and need no camera calibration.</td><td>computed from each video</td></tr>
+          <tr><td>11 event classes</td><td>One rule per class, written from the task's definitions, applied to the tracks and the
+            layout.</td><td>rules</td></tr>
+          <tr><td>Accident, fire, obstacle</td><td>Candidates come from tracks touching, a fire detector, objects that appear on the
+            road, and a check of the whole frame every few seconds. Qwen3-VL-2B must answer yes on frames of the video before
+            one is reported.</td><td>pre-trained models and rules</td></tr>
+          <tr><td>Collision risk</td><td>A separate detector and tracker. The score rises when two road users are on a collision
+            course.</td><td>rules</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="block cols">
+      <div>
+        <h3>Models</h3>
+        <div class="tbl"><table>
+          <thead><tr><th>Model</th><th>Role</th><th>Licence</th></tr></thead>
+          <tbody>
+            <tr><td>YOLO11-L</td><td>road users, signal heads</td><td>AGPL-3.0</td></tr>
+            <tr><td>ByteTrack</td><td>tracking</td><td>MIT</td></tr>
+            <tr><td>Mask2Former Swin-L (Vistas)</td><td>road, kerbs, paint</td><td>model card</td></tr>
+            <tr><td>Qwen3-VL-2B-Instruct</td><td>confirms rare events</td><td>Apache-2.0</td></tr>
+            <tr><td>fire-smoke YOLOv8n</td><td>fire and smoke</td><td>AGPL-3.0</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div>
+        <h3>Data</h3>
+        <div class="tbl"><table>
+          <thead><tr><th>Data</th><th>Used for</th></tr></thead>
+          <tbody>
+            <tr><td>The four sample videos</td><td>our own event annotations, for development</td></tr>
+            <tr><td>TAD, TAD-benchmark, UCF-Crime</td><td>accident checks on other cameras</td></tr>
+            <tr><td>TUMTraf Accid3nD</td><td>real crashes and a fire on a motorway</td></tr>
+            <tr><td>D-Fire</td><td>fire and smoke checks</td></tr>
+          </tbody>
+        </table></div>
+        <p class="caption">Nothing was trained or fine-tuned (four sample videos are too few to train an event model); public data was used for testing only.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<section id="explorer">
+  <div class="wrap">
+    <div class="head">
+      <div class="kicker"><span>02</span>Explorer</div>
+      <h2>Explorer</h2>
+      <p class="lede">Pick a video and turn layers on or off. Click the timeline or the chart to jump to a moment. Every video, including your own from the demo, gets the same view.</p>
+    </div>
+    <div class="clip-groups" id="clip-groups"></div>
+    <div class="stage" id="stage">
+      <video id="video" playsinline preload="metadata" controls controlslist="nofullscreen"></video>
+      <button class="fs" id="fullscreen" aria-label="Full screen" title="Full screen"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      <canvas id="overlay"></canvas>
+      <div class="chips" id="active"></div>
+    </div>
+    <div class="layers" id="layers"></div>
+    <p class="caption" id="clip-info"></p>
+    <div class="tl" id="timeline"></div>
+    <div class="row-between">
+      <span></span>
+      <a class="small-link" id="download" href="#" download>Download the annotated video</a>
+    </div>
+    <div class="block">
+      <h3>Road users over time</h3>
+      <div class="chart" id="counts-chart"></div>
+      <div class="legend" id="counts-legend"></div>
+    </div>
+
+    <div class="block">
+      <h3>Where road users go</h3>
+      <div class="tabs small" id="map-tabs" role="tablist"></div>
+      <div class="viewer"><canvas id="map"></canvas></div>
+      <p class="caption" id="map-caption"></p>
+    </div>
+
+    <div class="block" id="eda">
+      <h3>EDA</h3>
+      <div class="tbl"><table id="eda-table">
+        <thead><tr><th>Video</th><th>Light</th><th class="n">Resolution</th><th class="n">fps</th><th class="n">Duration</th><th class="n">Cars / frame</th><th class="n">People / frame</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <ol class="findings">
+        <li><div><b>Queues follow the traffic light.</b><p>On red, standing vehicles build up behind the near stop line; on
+          green they clear. This is how the pipeline finds which signal head controls the approach.</p></div></li>
+        <li><div><b>Cars wait inside the junction.</b><p>Cars stand in the middle of the junction for up to 45 s, waiting for
+          their turn to move on. This is normal here, so it is not reported as a stopped vehicle.</p></div></li>
+        <li><div><b>The camera is not in the same place in every video.</b><p>C3902 is shifted and zoomed compared with C3896,
+          so a layout drawn once by hand would be off. The layout is inferred for each video instead.</p></div></li>
+        <li><div><b>Cars near the camera look almost four times wider than far away.</b><p>Speeds and distances are measured
+          in car widths, so the same thresholds work across the whole image.</p></div></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<section id="results">
+  <div class="wrap">
+    <div class="head">
+      <div class="kicker"><span>03</span>Results</div>
+      <h2>Results</h2>
+    </div>
+    <div class="cols">
+      <div>
+        <h3>Accuracy on the sample videos</h3>
+        <div class="tbl"><table id="class-table">
+          <thead><tr><th>Class</th><th class="n">Reported</th><th class="n">F1</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+        <p class="caption">Measured with the organisers' <code>evaluate.py</code> against our own frame-by-frame
+          annotations of the four samples. F1 is averaged over temporal overlaps (tIoU) of 0.3, 0.5 and 0.7; the score
+          is the mean over classes.</p>
+      </div>
+      <div>
+        <h3>One example of each class</h3>
+        <div class="examples" id="examples"></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3>Failure cases</h3>
+      <ol class="findings" id="failures"></ol>
+    </div>
+
+    <div class="block">
+      <h3>Other cameras</h3>
+      <div class="tbl"><table id="public-table">
+        <thead><tr><th>Dataset</th><th class="n">Clips</th><th>Result</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <p class="caption">Same code and settings as for the samples. Only TUMTraf Accid3nD footage is shown in the explorer:
+        its licence (CC BY-NC-SA 4.0) allows it, and our annotated versions are shared under the same licence.</p>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<section id="demo">
+  <div class="wrap">
+    <div class="head">
+      <div class="kicker"><span>04</span>Live demo</div>
+      <h2>Live demo</h2>
+      <p class="lede">Upload a video from a fixed traffic camera. Any length is accepted; the first 2 minutes are analysed.
+        The result opens in the explorer above.</p>
+    </div>
+    <label class="drop" id="drop">
+      <input type="file" accept="video/mp4,video/quicktime" hidden id="file">
+      <b>Choose a video</b> or drop it here
+      <small>.mp4 · up to 4 GB · the first 2 minutes are analysed</small>
+    </label>
+    <div class="progress"><div id="bar"></div></div>
+    <div class="status" id="status"></div>
+    <p class="caption">No video to hand? <a href="#" id="try-sample">Run a 60-second part of a sample video</a>.</p>
+  </div>
+</section>
+
+<hr>
+
+<section id="team">
+  <div class="wrap">
+    <div class="head">
+      <div class="kicker"><span>05</span>Team</div>
+      <h2>Team</h2>
+    </div>
+    <div class="team">
+      <div class="person">
+        <h3>Amirkhon Aripov</h3>
+        <div class="role">Team lead · perception and scene</div>
+        <p>Detection and tracking, the automatic scene layout, rare-event checks and the Part B risk model; our
+          annotations of the samples and the evaluation on public data.</p>
+        <ul>
+          <li>Head of Data Engineering at Humanola: built its 3D hand-pose pipeline for egocentric video</li>
+          <li>Co-founder of Dorminder, a service for finding roommates</li>
+        </ul>
+        <div class="links">
+          <a href="https://github.com/amirkhonaripov">GitHub</a>
+          <a href="https://www.linkedin.com/in/amirkhonaripov/">LinkedIn</a>
+          <a href="https://huggingface.co/datasets/humanola-inc/egocentric_labeled">Humanola dataset</a>
+        </div>
+      </div>
+      <div class="person">
+        <h3>Nurjahon Kandaharov</h3>
+        <div class="role">Event rules</div>
+        <p>The rule-based event logic: signal violations, pedestrian rules and vehicle manoeuvres, and turning
+          detections into clean, non-overlapping event segments.</p>
+        <ul>
+          <li>Co-founder of Aixposure: co-developed its tool that measures how visible a brand is in AI search answers (GEO)</li>
+          <li>Co-founder of Dorminder, a service for finding roommates</li>
+        </ul>
+        <div class="links">
+          <a href="https://github.com/nurikProger">GitHub</a>
+          <a href="https://www.linkedin.com/in/nurjahon-kandaharov-605637275">LinkedIn</a>
+        </div>
+      </div>
+      <div class="person">
+        <h3>Doniyorbek Turgunpulatov</h3>
+        <div class="role">Website and demo</div>
+        <p>This website, the live demo and its server, the annotated-video renderer and the charts of the sample
+          videos.</p>
+        <ul>
+          <li>Contributed to satelbek.com, a platform for SAT preparation</li>
+          <li>Founder of SynParse: a Chrome extension that shows definitions and synonyms of a highlighted word</li>
+        </ul>
+        <div class="links">
+          <a href="https://github.com/Doniyorbek2006">GitHub</a>
+          <a href="https://www.linkedin.com/in/doniyorbek-turgunpulatov-710025347/">LinkedIn</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<section id="links">
+  <div class="wrap">
+    <div class="head"><div class="kicker"><span>06</span>Links</div></div>
+    <div class="linklist">
+      <a href="https://github.com/amirkhonaripov/dna-traffic-events" id="link-repo"><b>Repository</b><small>code, README, one-command run</small></a>
+      <a href="https://github.com/amirkhonaripov/dna-traffic-events/tree/main/weights" id="link-weights"><b>Weights</b><small>fetched by weights/download.sh</small></a>
+      <a href="data/predictions_samples.json"><b>predictions_samples.json</b><small>our output on the four samples</small></a>
+      <a href="report.html"><b>Report</b><small>what worked, what did not, what next</small></a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>Team DNA · WIUT Hackathon 2026. Sample footage belongs to the organisers.</span>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>
