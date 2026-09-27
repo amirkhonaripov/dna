@@ -166,7 +166,7 @@ ol.findings p { margin: 4px 0 0; font-size: 15px; }
 
 /* demo */
 .drop {
-  border: 1px dashed var(--muted); border-radius: 3px; padding: 40px 24px; text-align: center; cursor: pointer;
+  display: block; border: 1px dashed var(--muted); border-radius: 3px; padding: 40px 24px; text-align: center; cursor: pointer;
   transition: border-color .15s, background .15s;
 }
 .drop:hover, .drop.over { border-color: var(--ink); background: var(--panel); }
