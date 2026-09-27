@@ -599,7 +599,7 @@ function demo() {
     if (cur || !DEMO_API) return;
     if (file && file.size > 4e9) { note.hidden = false; note.textContent = "That file is over 4 GB."; return; }
     const me = cur = { upload: null, driveFile: null, job: null, xhrs: new Set(), cancelled: false };
-    const title = file ? `${file.name} · ${mb(file.size)} MB` : "Sample video, 60 s";
+    const title = file ? `${file.name} · ${mb(file.size)} MB` : "Sample video";
     showPanel(title);
     say("Connecting to the server… after a quiet spell it takes up to a minute to start.", 0.02);
     const finish = msg => { if (me.cancelled) return; cur = null; say(msg); cancelBtn.textContent = "Upload another"; };
@@ -621,7 +621,7 @@ function demo() {
         const spec = me.driveFile ? { upload: me.upload, drive_file: me.driveFile } : { upload: me.upload };
         me.job = (await post("/jobs", JSON.stringify(spec), JSON_HDR)).id;
       } else {
-        me.job = (await post("/jobs", JSON.stringify({ sample: "C3905_60s" }), JSON_HDR)).id;
+        me.job = (await post("/jobs", JSON.stringify({ sample: "C3902_0-140s" }), JSON_HDR)).id;
       }
     } catch (err) { return finish(`Not accepted: ${err.message}.`); }
     for (;;) {
@@ -635,9 +635,9 @@ function demo() {
       if (st.state === "cancelled") return finish("Cancelled.");
       if (st.state !== "done") { say(`${st.stage || "Queued"}…`, 0.3 + 0.7 * (st.progress || 0)); continue; }
       const n = st.result.events;
-      finish(`Done: ${n} event${n === 1 ? "" : "s"}${st.result.trimmed ? " in the first 2 minutes" : ""}. Opened in the explorer above.`);
+      finish(`Done: ${n} event${n === 1 ? "" : "s"}${st.result.trimmed ? " in the first 3 minutes" : ""}. Opened in the explorer above.`);
       bar.style.width = "100%";
-      const entry = { id: st.result.clip, title: file ? file.name.slice(0, 28) : "Sample, 60 s", group: "upload",
+      const entry = { id: st.result.clip, title: file ? file.name.slice(0, 28) : "Sample video", group: "upload",
         base: `${DEMO_API}/jobs/${me.job}/site/` };
       X.index.push(entry);
       X.tabs.upload.add(entry);
